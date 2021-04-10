@@ -15,5 +15,5 @@ source ~/anaconda/bin/activate
 conda activate lbb
 cd ~/proyecto_grado/lbb/localbitsback
 
-PYTHONPATH=./:compression/ans/build/ python scripts/run_compression.py --dataset cifar10 --mode val_only 
+PYTHONPATH=./:compression/ans/build/ python scripts/run_compression.py --dataset imagenet64 --mode val_only 
 
