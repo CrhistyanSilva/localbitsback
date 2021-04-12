@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.utils.data
 import torchvision
+from PIL import Image
 
 
 def seed_all(seed):
@@ -70,6 +71,29 @@ def process_gaussian(A: torch.Tensor, scale: float, inverted: bool):
 class CIFAR10WithoutLabels(torchvision.datasets.CIFAR10):
     def __getitem__(self, index):
         return (super().__getitem__(index)[0],)
+
+
+def load_image_and_crop(image_fn):
+    img = np.array(Image.open(image_fn))
+    img2 = np.hstack([img, img])
+    img = np.vstack([img2, img2])
+    h, w, _ = img.shape
+    print('size:', h, w)
+
+    crops = []
+    for i in range(h // 64):
+        for j in range(w // 64):
+            print(i, j)
+            crop = img[i*64:(i+1)*64, j*64:(j+1)*64, :]
+            crops.append(crop)
+
+    dataset = np.array(crops)
+    return torch.utils.data.TensorDataset(torch.from_numpy(dataset).permute(0, 3, 1, 2).to(dtype=torch.int64)), len(crops)
+
+
+def load_image(image_fn):
+    dataset = np.array([np.array(Image.open(image_fn))])
+    return torch.utils.data.TensorDataset(torch.from_numpy(dataset).permute(0, 3, 1, 2).to(dtype=torch.int64))
 
 
 def load_imagenet_data(npy_path):
