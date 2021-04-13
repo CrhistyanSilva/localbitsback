@@ -75,15 +75,11 @@ class CIFAR10WithoutLabels(torchvision.datasets.CIFAR10):
 
 def load_image_and_crop(image_fn):
     img = np.array(Image.open(image_fn))
-    img2 = np.hstack([img, img])
-    img = np.vstack([img2, img2])
     h, w, _ = img.shape
-    print('size:', h, w)
 
     crops = []
     for i in range(h // 64):
         for j in range(w // 64):
-            print(i, j)
             crop = img[i*64:(i+1)*64, j*64:(j+1)*64, :]
             crops.append(crop)
 

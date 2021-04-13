@@ -7,6 +7,7 @@ import torch
 import torch.utils.data
 import torchvision
 from tqdm import tqdm, trange
+import glob
 
 import compression.logistic
 import compression.models
@@ -175,11 +176,14 @@ def main_val(dataloader, model, device):
     for batch, in tqdm(dataloader):
         batch_result = model.forward(batch.to(dtype=torch.float64, device=device))
         all_bpds.extend((batch_result['total_logd'] / (-math.log(2.) * int(np.prod(batch.shape[1:])))).tolist())
+
+    bpd = np.mean(all_bpds)
+    std = np.std(all_bpds)
+    tmp = time.time() - start_time
+    num_crops = len(all_bpds)
     
-    print('overall bpd: {} +/- {}, total time: {}, num datapoints: {}'.format(
-        np.mean(all_bpds), np.std(all_bpds), time.time() - start_time, len(all_bpds)
-    ))
-    return len(all_bpds)
+    print(f'overall bpd: {bpd} +/- {std}, total time: {tmp}, num datapoints: {num_crops}')
+    return [bpd, std, tmp, len(all_bpds)]
 
 
 def main():
@@ -192,14 +196,10 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     # Dataset arguments
     parser.add_argument('--dataset', type=str, required=True)
-    parser.add_argument('--image_fn', type=str, required=True)
+    parser.add_argument('-i', '--input', type=str, required=True)
+    parser.add_argument('--single_image', action='store_true')
     parser.add_argument('--limit_dataset_size', type=int, default=None)
-    parser.add_argument('--cifar10_data_path', type=str, default='data')
-    parser.add_argument('--imagenet32_data_path', type=str, default='~/data/imagenet-small/valid_32x32.npy')
     parser.add_argument('--imagenet64_data_path', type=str, default='~/data/imagenet-small/valid_64x64.npy')
-    # Model arguments
-    parser.add_argument('--cifar10_model', type=str, default='~/data/flowpp_cifar_model.npz')
-    parser.add_argument('--imagenet32_model', type=str, default='~/data/flowpp_imagenet32_model.npz')
     parser.add_argument('--imagenet64_model', type=str, default='~/data/flowpp_imagenet64_model.npz')
     # Script mode
     parser.add_argument('--test_output_filename', type=str, default=None)
@@ -218,19 +218,36 @@ def main():
     # Load data
     model_ctor = compression.models.load_imagenet64_model
     model_filename = os.path.expanduser(args.imagenet64_model)
-    dataset, bs = load_image_and_crop(args.image_fn)
 
-    dataloader, dataset = make_testing_dataloader(
-        dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=bs
-    )
+    if args.single_image:
+        image_list = [args.input]
+    else:
+        image_list = glob.glob(args.input + '/*.png')
 
-    # Load model
-    device = torch.device('cpu' if args.cpu else 'cuda')
-    model = model_ctor(model_filename, force_float32_cond=True).to(device=device)
+    results = []
+    for i, filename in enumerate(image_list):
+        print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
+        dataset, bs = load_image_and_crop(filename)
 
-    # Dispatch to the chosen mode's main function
-    num_datapoints_processed = main_val(dataloader, model, device)
-    assert num_datapoints_processed == len(dataset)
+        dataloader, dataset = make_testing_dataloader(
+            dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=64
+        )
+
+        # Load model
+        device = torch.device('cpu' if args.cpu else 'cuda')
+        model = model_ctor(model_filename, force_float32_cond=True).to(device=device)
+
+        # Dispatch to the chosen mode's main function
+        result = main_val(dataloader, model, device)
+        assert result[3] == len(dataset)
+
+        results.append(result)
+    
+    results = np.array(results)
+    means = np.sum(results, axis=0) / len(image_list)
+
+    print('OVERALL RESULTS:')
+    print(f'bpd: {means[0]} +/- {means[1]}, total time: {means[2]}, num datapoints: {means[3]}')
 
 
 if __name__ == '__main__':
