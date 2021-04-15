@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=lbb_clic_mobile
+#SBATCH --job-name=lbb_kodak
 #SBATCH --ntasks=1
 #SBATCH --mem=32G
 #SBATCH --time=6:00:00
@@ -11,8 +11,8 @@
 #SBATCH --output=%x_%j.out
 
 source /etc/profile.d/modules.sh
-source $CONDA_PYTHON_EXE
+source $CONDA_ACTIVATE
 conda activate lbb
 cd ~/proyecto_grado/lbb/localbitsback
 
-PYTHONPATH=.:compression/ans/build/ python scripts/run_compression_custom.py --input /clusteruy/home03/compresion_imgRN/mobile_valid_cropped/ --dataset imagenet64
+PYTHONPATH=.:compression/ans/build/ python scripts/run_compression_custom.py --input /clusteruy/home03/compresion_imgRN/kodak_cropped/ --dataset imagenet64
