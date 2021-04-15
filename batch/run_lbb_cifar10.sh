@@ -11,7 +11,7 @@
 #SBATCH --output=%x_%j.out
 
 source /etc/profile.d/modules.sh
-source $CONDA_PYTHON_EXE
+source $CONDA_ACTIVATE
 conda activate lbb
 cd ~/proyecto_grado/lbb/localbitsback
 
