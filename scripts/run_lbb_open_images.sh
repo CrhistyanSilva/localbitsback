@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=lbb_kodak
+#SBATCH --job-name=lbb_open_images
 #SBATCH --ntasks=1
 #SBATCH --mem=32G
 #SBATCH --time=6:00:00
@@ -15,4 +15,4 @@ source $CONDA_PYTHON_EXE
 conda activate lbb
 cd ~/proyecto_grado/lbb/localbitsback
 
-PYTHONPATH=.:compression/ans/build/ python scripts/run_compression_custom.py --input /clusteruy/home03/compresion_imgRN/kodak_cropped/ --dataset imagenet64
+PYTHONPATH=.:compression/ans/build/ python scripts/run_compression_custom.py --input /clusteruy/home03/compresion_imgRN/val_oi_500_r_cropped --dataset imagenet64

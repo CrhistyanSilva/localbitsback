@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=lbb_clic
+#SBATCH --job-name=lbb_clic_mobile
 #SBATCH --ntasks=1
 #SBATCH --mem=32G
 #SBATCH --time=6:00:00
@@ -11,7 +11,7 @@
 #SBATCH --output=%x_%j.out
 
 source /etc/profile.d/modules.sh
-source ~/anaconda/bin/activate
+source $CONDA_PYTHON_EXE
 conda activate lbb
 cd ~/proyecto_grado/lbb/localbitsback
 
