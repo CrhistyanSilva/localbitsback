@@ -13,7 +13,19 @@ import compression.models
 from compression.bitstream import Bitstream, CompressionModel
 from compression.blackbox import BlackBoxBitstream
 from compression.utils import setup, load_imagenet_data, CIFAR10WithoutLabels, make_testing_dataloader
+import cv2
 
+def tensor_to_image(x_raw):
+    img = x_raw.cpu().data.numpy()[0]
+    img = np.moveaxis(img, 0, -1)
+
+    red = img[:, :, 2].copy()
+    blue = img[:, :, 0].copy()
+
+    img[:, :, 0] = red
+    img[:, :, 2] = blue
+
+    return img
 
 def main_compression_test(*, stream: Bitstream, model: CompressionModel, dataloader, device):
     """
@@ -35,6 +47,8 @@ def main_compression_test(*, stream: Bitstream, model: CompressionModel, dataloa
         curr_bits_before = len(stream)
         encoded_x_raw.append(x_raw)
         x_raw = x_raw.to(device=device)
+        img = tensor_to_image(x_raw)
+        cv2.imwrite('original.png', img)
         dbg_info = model.encode(x_raw, stream=stream)
         encoded_dbg_info.append(dbg_info)
         shortest_post_decode_len = min(shortest_post_decode_len, min(dbg_info['post_decode_lengths']))
@@ -75,6 +89,9 @@ def main_compression_test(*, stream: Bitstream, model: CompressionModel, dataloa
     for i_batch in trange(num_batches, desc='decoding'):
         dbg_info = encoded_dbg_info[-(i_batch + 1)]
         x_raw = model.decode(bs=dbg_info['z_sym'].shape[0], stream=stream, encoding_dbg_info=dbg_info)
+        img = tensor_to_image(x_raw)
+        cv2.imwrite('decoded.png', img)
+
         if not (x_raw == encoded_x_raw[-(i_batch + 1)].to(device=device)).all():
             decoding_passed = False
             break
@@ -274,7 +291,7 @@ def main():
                     stream=_make_stream(), model=model, dataloader=dataloader, device=device,
                 )
             }
-            with open(args.test_output_filename, 'w') as f:
+            with open(os.path.expanduser(args.test_output_filename), 'w') as f:
                 f.write(json.dumps(output) + '\n')
 
         elif args.mode == 'timing_test_compositional':

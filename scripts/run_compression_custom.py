@@ -196,6 +196,7 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     # Dataset arguments
     parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--mode', default='val_only', type=str)
     parser.add_argument('-i', '--input', type=str, required=True)
     parser.add_argument('--single_image', action='store_true')
     parser.add_argument('--limit_dataset_size', type=int, default=None)
@@ -218,37 +219,73 @@ def main():
     # Load data
     model_ctor = compression.models.load_imagenet64_model
     model_filename = os.path.expanduser(args.imagenet64_model)
+    args.input = os.path.expanduser(args.input)
 
     if args.single_image:
         image_list = [args.input]
     else:
         image_list = glob.glob(args.input + '/*.png')
 
-    results = []
-    for i, filename in enumerate(image_list):
-        print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
-        dataset, bs = load_image_and_crop(filename)
+    # Load model
+    device = torch.device('cpu' if args.cpu else 'cuda')
+    model = model_ctor(model_filename, force_float32_cond=True).to(device=device)
 
-        dataloader, dataset = make_testing_dataloader(
-            dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=64
-        )
+    if args.mode == 'val_only':
+        results = []
+        for i, filename in enumerate(image_list):
+            print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
+            dataset, bs = load_image_and_crop(filename)
 
-        # Load model
-        device = torch.device('cpu' if args.cpu else 'cuda')
-        model = model_ctor(model_filename, force_float32_cond=True).to(device=device)
+            dataloader, dataset = make_testing_dataloader(
+                dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=64
+            )
 
-        # Dispatch to the chosen mode's main function
-        result = main_val(dataloader, model, device)
-        assert result[3] == len(dataset)
+            # Dispatch to the chosen mode's main function
+            result = main_val(dataloader, model, device)
+            assert result[3] == len(dataset)
 
-        results.append(result)
-    
-    results = np.array(results)
-    means = np.sum(results, axis=0) / len(image_list)
+            results.append(result)
 
-    print('OVERALL RESULTS:')
-    print(f'bpd: {means[0]} +/- {means[1]}, total time: {means[2]}, num datapoints: {means[3]}')
+        results = np.array(results)
+        means = np.sum(results, axis=0) / len(image_list)
 
+        print('OVERALL RESULTS:')
+        print(f'bpd: {means[0]} +/- {means[1]}, total time: {means[2]}, num datapoints: {means[3]}')
+    elif args.mode == 'test':
+
+        def _make_stream(total_init_bits_=None):
+            return Bitstream(
+                device=device,
+                noise_scale=2 ** (-args.neg_log_noise_scale),
+                disc_bits=args.disc_bits,
+                disc_range=args.disc_range,
+                ans_mass_bits=args.ans_mass_bits,
+                ans_init_seed=0,
+                ans_init_bits=(
+                    int(np.ceil(total_init_bits_ / args.ans_num_streams)) if total_init_bits_ is not None
+                    else args.ans_init_bits  # the --ans_init_bits argument value is the default
+                ),
+                ans_num_streams=args.ans_num_streams
+            )
+
+        results = []
+        for i, filename in enumerate(image_list):
+            assert args.test_output_filename is not None
+            print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
+            dataset, bs = load_image_and_crop(filename)
+
+            dataloader, dataset = make_testing_dataloader(
+                dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=1
+            )
+
+            output = {
+                'args': vars(args),
+                'results': main_compression_test(
+                    stream=_make_stream(), model=model, dataloader=dataloader, device=device,
+                )
+            }
+            with open(os.path.expanduser(args.test_output_filename), 'w') as f:
+                f.write(json.dumps(output) + '\n')
 
 if __name__ == '__main__':
     main()
