@@ -157,7 +157,8 @@ def main_timing_test_custom(batches, model, stream: Bitstream, device):
         tstart = time.time()
         decoded_batches.append(model.decode(bs=dbg_info['z_sym'].shape[0], stream=stream, encoding_dbg_info=None))
         dec_times.append(time.time() - tstart)
-    assert torch.allclose(datapoints, torch.cat(decoded_batches[::-1], 0))
+    if not torch.allclose(datapoints, torch.cat(decoded_batches[::-1], 0)):
+        print('Image failed')
 
     print('enc times', enc_times)
     print('dec times', dec_times)
@@ -321,6 +322,7 @@ def main():
         elif args.mode == 'timing_test_compositional':
             results = []
             for i, filename in enumerate(image_list):
+                print('-------------------------------------------------------------------------------------')
                 print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
                 dataset, bs = load_image_and_crop(filename)
 
