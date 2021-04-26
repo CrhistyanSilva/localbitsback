@@ -1,19 +1,20 @@
+import argparse
+import glob
 import json
 import math
+import os
 import time
 
 import numpy as np
 import torch
 import torch.utils.data
-import torchvision
 from tqdm import tqdm, trange
-import glob
 
 import compression.logistic
 import compression.models
 from compression.bitstream import Bitstream, CompressionModel
 from compression.blackbox import BlackBoxBitstream
-from compression.utils import setup, load_imagenet_data, load_image, load_image_and_crop, CIFAR10WithoutLabels, make_testing_dataloader
+from compression.utils import setup, load_image_and_crop, make_testing_dataloader
 
 
 def main_compression_test(*, stream: Bitstream, model: CompressionModel, dataloader, device):
@@ -135,6 +136,36 @@ def main_timing_test(batches, model, stream: Bitstream, device):
     print('dec: {} +/- {} sec'.format(np.mean(dec_times[1:]), np.std(dec_times[1:])))
 
 
+def main_timing_test_custom(batches, model, stream: Bitstream, device):
+    """
+    Timing test for the compositional algorithm
+    """
+
+    batches = [b.to(device=device) for b in batches]
+    datapoints = torch.cat(batches, 0)
+
+    # Coding with the compositional algorithm
+    enc_times = []
+    encoded_dbg_info = []
+    for x_raw in tqdm(batches, desc='encoding'):
+        tstart = time.time()
+        encoded_dbg_info.append(model.encode(x_raw, stream=stream))
+        enc_times.append(time.time() - tstart)
+    dec_times = []
+    decoded_batches = []
+    for dbg_info in tqdm(encoded_dbg_info[::-1], desc='decoding'):
+        tstart = time.time()
+        decoded_batches.append(model.decode(bs=dbg_info['z_sym'].shape[0], stream=stream, encoding_dbg_info=None))
+        dec_times.append(time.time() - tstart)
+    assert torch.allclose(datapoints, torch.cat(decoded_batches[::-1], 0))
+
+    print('enc times', enc_times)
+    print('dec times', dec_times)
+    print('enc: {} +/- {} sec'.format(np.mean(enc_times[1:]), np.std(enc_times[1:])))
+    print('dec: {} +/- {} sec'.format(np.mean(dec_times[1:]), np.std(dec_times[1:])))
+
+
+
 def main_timing_test_blackbox(datapoints, model: CompressionModel, bbstream: BlackBoxBitstream):
     """
     Timing test for the black box algorithm
@@ -181,13 +212,12 @@ def main_val(dataloader, model, device):
     std = np.std(all_bpds)
     tmp = time.time() - start_time
     num_crops = len(all_bpds)
-    
+
     print(f'overall bpd: {bpd} +/- {std}, total time: {tmp}, num datapoints: {num_crops}')
     return [bpd, std, tmp, len(all_bpds)]
 
 
 def main():
-    import argparse, os
     parser = argparse.ArgumentParser()
     # Common arguments
     parser.add_argument('--seed', type=int, default=0)
@@ -251,8 +281,7 @@ def main():
 
         print('OVERALL RESULTS:')
         print(f'bpd: {means[0]} +/- {means[1]}, total time: {means[2]}, num datapoints: {means[3]}')
-    elif args.mode == 'test':
-
+    else:
         def _make_stream(total_init_bits_=None):
             return Bitstream(
                 device=device,
@@ -268,24 +297,42 @@ def main():
                 ans_num_streams=args.ans_num_streams
             )
 
-        results = []
-        for i, filename in enumerate(image_list):
-            assert args.test_output_filename is not None
-            print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
-            dataset, bs = load_image_and_crop(filename)
+        if args.mode == 'test':
 
-            dataloader, dataset = make_testing_dataloader(
-                dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=1
-            )
+            results = []
+            for i, filename in enumerate(image_list):
+                assert args.test_output_filename is not None
+                print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
+                dataset, bs = load_image_and_crop(filename)
 
-            output = {
-                'args': vars(args),
-                'results': main_compression_test(
-                    stream=_make_stream(), model=model, dataloader=dataloader, device=device,
+                dataloader, dataset = make_testing_dataloader(
+                    dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=1
                 )
-            }
-            with open(os.path.expanduser(args.test_output_filename), 'w') as f:
-                f.write(json.dumps(output) + '\n')
+
+                output = {
+                    'args': vars(args),
+                    'results': main_compression_test(
+                        stream=_make_stream(), model=model, dataloader=dataloader, device=device,
+                    )
+                }
+                with open(os.path.expanduser(args.test_output_filename), 'w') as f:
+                    f.write(json.dumps(output) + '\n')
+
+        elif args.mode == 'timing_test_compositional':
+            results = []
+            for i, filename in enumerate(image_list):
+                print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
+                dataset, bs = load_image_and_crop(filename)
+
+                dataloader, dataset = make_testing_dataloader(
+                    dataset, seed=args.seed, limit_dataset_size=args.limit_dataset_size, bs=128
+                )
+
+                batches = []
+                for (x_raw,) in dataloader:
+                    batches.append(x_raw)
+                main_timing_test_custom(batches, model=model, stream=_make_stream(), device=device)
+
 
 if __name__ == '__main__':
     main()

@@ -98,13 +98,5 @@ def load_imagenet_data(npy_path):
 
 
 def make_testing_dataloader(dataset, *, seed, limit_dataset_size, bs):
-    # Fixed random permutation of the dataset for experiment purposes only
-    dataset = torch.utils.data.dataset.Subset(
-        dataset,
-        np.random.RandomState(seed=seed).permutation(len(dataset)).tolist()
-    )
-    # Subsample dataset if requested
-    if limit_dataset_size:
-        dataset = torch.utils.data.dataset.Subset(dataset, list(range(0, min(len(dataset), limit_dataset_size))))
     # Turn into batches
     return torch.utils.data.DataLoader(dataset, batch_size=bs, shuffle=False, drop_last=False), dataset
