@@ -17,6 +17,7 @@ import datetime
 
 from optimization.training import train, evaluate
 from compression.utils import load_imagenet_data
+import compression
 
 parser = argparse.ArgumentParser(description='PyTorch Discrete Normalizing flows')
 
@@ -53,7 +54,7 @@ parser.add_argument('-e', '--epochs', type=int, default=2000, metavar='EPOCHS',
 parser.add_argument('-es', '--early_stopping_epochs', type=int, default=300, metavar='EARLY_STOPPING',
                     help='number of early stopping epochs')
 
-parser.add_argument('-bs', '--batch_size', type=int, default=2, metavar='BATCH_SIZE',
+parser.add_argument('-bs', '--batch_size', type=int, default=4, metavar='BATCH_SIZE',
                     help='input batch size for training (default: 100)')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, metavar='LEARNING_RATE',
                     help='learning rate')
@@ -214,13 +215,20 @@ def run(args, kwargs):
     # model.set_temperature(args.temperature)
     # model.enable_hard_round(args.hard_round)
 
+
+    # Load data
+    model_ctor = compression.models.load_imagenet64_model
+    model_filename = os.path.expanduser('/home/crhistyan/Desktop/datasets_proyecto/imagenet64/flowpp_imagenet64_model.npz')
+
+    # Load model
+    model = model_ctor(model_filename, force_float32_cond=True).to(device=args.device)
     model_sample = model
 
     # if torch.cuda.device_count() > 1:
         # print("Let's use", torch.cuda.device_count(), "GPUs!")
         # model = torch.nn.DataParallel(model, dim=0)
 
-    model.to(device=args.device)
+    # model.to(device=args.device)
     print('Device:', args.device)
 
     def lr_lambda(epoch):

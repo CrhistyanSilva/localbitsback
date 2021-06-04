@@ -1,10 +1,9 @@
 from __future__ import print_function
-import torch
-
-from optimization.loss import calculate_loss
-from utils.visual_evaluation import plot_reconstructions
 
 import numpy as np
+import torch
+
+from utils.visual_evaluation import plot_reconstructions
 
 
 def train(epoch, train_loader, model, opt, args):
@@ -20,45 +19,26 @@ def train(epoch, train_loader, model, opt, args):
         data = data.to(dtype=torch.float64, device=args.device)
 
         opt.zero_grad()
-        loss, bpd, bpd_per_prior, pz, z, pys, py, ldj = model(data)
+        result = model(data)
+        # u, z, total_logd, dequant_logd = model(data)
 
-        loss = torch.mean(loss)
-        bpd = torch.mean(bpd)
-        bpd_per_prior = [torch.mean(i) for i in bpd_per_prior]
+        loss = -torch.mean(result['total_logd'])
+        bpd = -torch.mean(result['total_logd'])
 
         loss.backward()
         loss = loss.item()
         train_loss[batch_idx] = loss
         train_bpd[batch_idx] = bpd
 
-        ldj = torch.mean(ldj).item() / np.prod(args.input_size) / np.log(2)
-
         opt.step()
 
         num_data += len(data)
 
-        if batch_idx % args.log_interval == 0:
-            perc = 100. * batch_idx / len(train_loader)
+        perc = 100. * batch_idx / len(train_loader)
 
-            tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f}\tbits ldj: {:8.6f}'
-            print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd, ldj))
+        tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f}'
+        print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd))
 
-            print('z min: {:8.3f}, max: {:8.3f}'.format(torch.min(z).item() * 256, torch.max(z).item() * 256))
-
-            print('z  bpd: {:.3f}'.format(bpd_per_prior[0]))
-            for i in range(1, len(bpd_per_prior)):
-                print('y{} bpd: {:.3f}'.format(i-1, bpd_per_prior[i]))
-
-            print('pz mu', np.mean(pz[0].data.cpu().numpy(), axis=(0, 1, 2, 3)))
-            print('pz logs ', np.mean(pz[1].data.cpu().numpy(), axis=(0, 1, 2, 3)))
-            if len(pz) == 3:
-                print('pz pi   ', np.mean(pz[2].data.cpu().numpy(), axis=(0, 1, 2, 3)))
-
-            for i, py in enumerate(pys):
-                print('py{} mu   '.format(i), np.mean(py[0].data.cpu().numpy(), axis=(0, 1, 2, 3)))
-                print('py{} logs '.format(i), np.mean(py[1].data.cpu().numpy(), axis=(0, 1, 2, 3)))
-
-    from utils.visual_evaluation import plot_images
     import os
     if not os.path.exists(args.snap_dir + 'training/'):
         os.makedirs(args.snap_dir + 'training/')
@@ -112,9 +92,9 @@ def evaluate(train_loader, val_loader, model, model_sample, args, testing=False,
 
     with open(file, 'a') as ff:
         msg = 'epoch {}\ttrain bpd {:.3f}\tval bpd {:.3f}\t'.format(
-                epoch,
-                bpd_train,
-                bpd_val)
+            epoch,
+            bpd_train,
+            bpd_val)
         print(msg, file=ff)
 
     loss = bpd_val * np.prod(args.input_size) * np.log(2.)
@@ -146,7 +126,7 @@ def evaluate(train_loader, val_loader, model, model_sample, args, testing=False,
                 print('====> Test set log-likelihood: {:.4f}'.format(log_likelihood))
 
                 print('====> Test set bpd (elbo): {:.4f}'.format(bpd))
-                print('====> Test set bpd (log-likelihood): {:.4f}'.format(log_likelihood/
+                print('====> Test set bpd (log-likelihood): {:.4f}'.format(log_likelihood /
                                                                            (np.prod(args.input_size) * np.log(2.))))
 
             else:

@@ -267,6 +267,6 @@ def load_imagenet64_model(filename, force_float32_cond, float32=False):
     if not float32:
         model = model.double()
     # freeze the model
-    for p in model.parameters():
-        p.requires_grad = False
+    # for p in model.parameters():
+    #     p.requires_grad = False
     return model
