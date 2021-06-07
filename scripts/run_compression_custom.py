@@ -261,8 +261,11 @@ def main():
     device = torch.device('cpu' if args.cpu else 'cuda')
     model = model_ctor(model_filename, force_float32_cond=True).to(device=device)
 
+    assert len(image_list) > 0
+
     if args.mode == 'val_only':
         results = []
+
         for i, filename in enumerate(image_list):
             print(f'Processing image {i + 1}/{len(image_list)} - {filename}')
             dataset, bs = load_image_and_crop(filename)

@@ -143,8 +143,8 @@ class Imagenet64Model(CompressionModel):
         if u is None:
             u, dequant_logd = self.calc_dequant_noise(x)
         assert u.shape == x.shape and dequant_logd.shape == (x.shape[0],)
-        # assert (u >= 0).all()
-        # assert (u <= 1).all()
+        assert (u >= 0).all()
+        assert (u <= 1).all()
 
         z, main_logd = self.main_flow(x + u, aux=None, inverse=False)
         z_logp = sumflat(standard_normal_logp(z))

@@ -173,7 +173,7 @@ class Conv2d(DataDepInitModule):
         self.b = Parameter(torch.Tensor(out_channels))
 
         init.normal_(self.w, 0, _WN_INIT_STDV)
-        init.zeros_(self.b)
+        init.ones_(self.b)
 
     def _init(self, x):
         # x.shape == (batch, channels, h, w)

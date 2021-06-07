@@ -6,7 +6,17 @@ import torch
 from utils.visual_evaluation import plot_reconstructions
 
 
-def train(epoch, train_loader, model, opt, args):
+# learning rate schedule
+def lr_step(step, curr_lr, decay=0.99995, min_lr=5e-4):
+    # only decay after certain point
+    # and decay down until minimal value
+    if step > 100000 and curr_lr > min_lr:
+        curr_lr *= decay
+        return curr_lr
+    return curr_lr
+
+
+def train(epoch, train_loader, model, opt, args, decay=0.99995):
     model.train()
     train_loss = np.zeros(len(train_loader))
     train_bpd = np.zeros(len(train_loader))
@@ -14,21 +24,28 @@ def train(epoch, train_loader, model, opt, args):
     num_data = 0
 
     for batch_idx, (data,) in enumerate(train_loader):
-        # data = data.view(-1, *args.input_size)
-
+        data = data.view(-1, *args.input_size)
         data = data.to(dtype=torch.float64, device=args.device)
+
+        global_step = (epoch - 1) * len(train_loader) + (batch_idx + 1)
+        # update the learning rate according to schedule
+        schedule = True
+        if schedule:
+            for param_group in opt.param_groups:
+                lr = param_group['lr']
+                lr = lr_step(global_step, lr, decay=decay)
+                param_group['lr'] = lr
 
         opt.zero_grad()
         result = model(data)
-        # u, z, total_logd, dequant_logd = model(data)
 
         loss = -torch.mean(result['total_logd'])
-        bpd = -torch.mean(result['total_logd'])
+        bpd = -torch.mean(result['total_logd']) / (64 * 64)
 
         loss.backward()
-        loss = loss.item()
-        train_loss[batch_idx] = loss
-        train_bpd[batch_idx] = bpd
+        # loss = loss.item()
+        # train_loss[batch_idx] = loss
+        # train_bpd[batch_idx] = bpd
 
         opt.step()
 

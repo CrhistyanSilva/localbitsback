@@ -54,9 +54,9 @@ parser.add_argument('-e', '--epochs', type=int, default=2000, metavar='EPOCHS',
 parser.add_argument('-es', '--early_stopping_epochs', type=int, default=300, metavar='EARLY_STOPPING',
                     help='number of early stopping epochs')
 
-parser.add_argument('-bs', '--batch_size', type=int, default=4, metavar='BATCH_SIZE',
+parser.add_argument('-bs', '--batch_size', type=int, default=8, metavar='BATCH_SIZE',
                     help='input batch size for training (default: 100)')
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, metavar='LEARNING_RATE',
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001, metavar='LEARNING_RATE',
                     help='learning rate')
 parser.add_argument('--warmup', type=int, default=10,
                     help='number of warmup epochs')
@@ -210,31 +210,24 @@ def run(args, kwargs):
 
     from compression.models.load_flowpp_imagenet64 import Imagenet64Model
 
-    model = Imagenet64Model(force_float32_cond=True)
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model.set_temperature(args.temperature)
-    # model.enable_hard_round(args.hard_round)
-
 
     # Load data
     model_ctor = compression.models.load_imagenet64_model
     model_filename = os.path.expanduser('/home/crhistyan/Desktop/datasets_proyecto/imagenet64/flowpp_imagenet64_model.npz')
 
     # Load model
-    model = model_ctor(model_filename, force_float32_cond=True).to(device=args.device)
-    model_sample = model
+    # model = model_ctor(model_filename, force_float32_cond=True)
+    model = Imagenet64Model(force_float32_cond=True).eval()
 
-    # if torch.cuda.device_count() > 1:
-        # print("Let's use", torch.cuda.device_count(), "GPUs!")
-        # model = torch.nn.DataParallel(model, dim=0)
-
-    # model.to(device=args.device)
+    model.to(device=args.device)
     print('Device:', args.device)
 
-    def lr_lambda(epoch):
-        return min(1., (epoch+1) / args.warmup) * np.power(args.lr_decay, epoch)
-    optimizer = optim.Adamax(model.parameters(), lr=args.learning_rate, eps=1.e-7)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=-1)
+    model_sample = model
+
+    # def lr_lambda(epoch):
+    #     return min(1., (epoch+1) / args.warmup) * np.power(args.lr_decay, epoch)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # ==================================================================================================================
     # TRAINING
@@ -250,12 +243,11 @@ def run(args, kwargs):
     train_times = []
 
     model.double()
-    model.eval()
-    model.train()
+    # model.eval()
+    # model.train()
 
     for epoch in range(1, args.epochs + 1):
         t_start = time.time()
-        scheduler.step()
         tr_loss, tr_bpd = train(epoch, train_loader, model, optimizer, args)
         train_bpd.append(tr_bpd)
         train_times.append(time.time()-t_start)
