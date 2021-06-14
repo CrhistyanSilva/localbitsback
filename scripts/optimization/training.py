@@ -10,7 +10,8 @@ from utils.visual_evaluation import plot_reconstructions
 def lr_step(step, curr_lr, decay=0.99995, min_lr=5e-4):
     # only decay after certain point
     # and decay down until minimal value
-    if step > 100000 and curr_lr > min_lr:
+    if step > 50 and curr_lr > min_lr:
+        print('updating learning rate')
         curr_lr *= decay
         return curr_lr
     return curr_lr
@@ -39,22 +40,20 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
         opt.zero_grad()
         result = model(data)
 
-        loss = -torch.mean(result['total_logd'])
-        bpd = -torch.mean(result['total_logd']) / (64 * 64)
+        if not torch.isnan(result['z']).any():
+            main_logd = -torch.mean(result['main_logd'])
+            loss = -torch.mean(result['total_logd'])
+            bpd = -torch.mean(result['z_logp']) / (64 * 64)
 
-        loss.backward()
-        # loss = loss.item()
-        # train_loss[batch_idx] = loss
-        # train_bpd[batch_idx] = bpd
+            loss.backward()
+            opt.step()
 
-        opt.step()
+            num_data += len(data)
 
-        num_data += len(data)
+            perc = 100. * batch_idx / len(train_loader)
 
-        perc = 100. * batch_idx / len(train_loader)
-
-        tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f}'
-        print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd))
+            tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f} \tMain logd: {:11.6f}'
+            print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd, main_logd))
 
     import os
     if not os.path.exists(args.snap_dir + 'training/'):

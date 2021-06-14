@@ -143,8 +143,8 @@ class Imagenet64Model(CompressionModel):
         if u is None:
             u, dequant_logd = self.calc_dequant_noise(x)
         assert u.shape == x.shape and dequant_logd.shape == (x.shape[0],)
-        assert (u >= 0).all()
-        assert (u <= 1).all()
+        # assert (u >= 0).all()
+        # assert (u <= 1).all()
 
         z, main_logd = self.main_flow(x + u, aux=None, inverse=False)
         z_logp = sumflat(standard_normal_logp(z))
@@ -156,6 +156,8 @@ class Imagenet64Model(CompressionModel):
             'z': z,
             'total_logd': total_logd,
             'dequant_logd': dequant_logd,
+            'z_logp': z_logp,
+            'main_logd': main_logd
         }
 
     def set_debug_print(self, b):
@@ -266,7 +268,4 @@ def load_imagenet64_model(filename, force_float32_cond, float32=False):
     model = Imagenet64Model(force_float32_cond=force_float32_cond).load_from_tf(filename).eval()
     if not float32:
         model = model.double()
-    # freeze the model
-    # for p in model.parameters():
-    #     p.requires_grad = False
     return model

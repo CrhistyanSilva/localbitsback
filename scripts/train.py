@@ -54,7 +54,7 @@ parser.add_argument('-e', '--epochs', type=int, default=2000, metavar='EPOCHS',
 parser.add_argument('-es', '--early_stopping_epochs', type=int, default=300, metavar='EARLY_STOPPING',
                     help='number of early stopping epochs')
 
-parser.add_argument('-bs', '--batch_size', type=int, default=8, metavar='BATCH_SIZE',
+parser.add_argument('-bs', '--batch_size', type=int, default=2, metavar='BATCH_SIZE',
                     help='input batch size for training (default: 100)')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001, metavar='LEARNING_RATE',
                     help='learning rate')
@@ -224,9 +224,6 @@ def run(args, kwargs):
     print('Device:', args.device)
 
     model_sample = model
-
-    # def lr_lambda(epoch):
-    #     return min(1., (epoch+1) / args.warmup) * np.power(args.lr_decay, epoch)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # ==================================================================================================================
@@ -243,8 +240,6 @@ def run(args, kwargs):
     train_times = []
 
     model.double()
-    # model.eval()
-    # model.train()
 
     for epoch in range(1, args.epochs + 1):
         t_start = time.time()
