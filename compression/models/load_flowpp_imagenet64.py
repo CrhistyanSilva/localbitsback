@@ -178,12 +178,12 @@ class Imagenet64Model(CompressionModel):
         def load(torch_name, tf_name, transform, ema=True):
             if ema:
                 tf_name += '/ExponentialMovingAverage'
-            tensor = torch.from_numpy(tf_params[tf_name])
-            if transform is not None:
-                tensor = transform(tensor)
+            tensor = torch.from_numpy(tf_params[torch_name])
+            # if transform is not None:
+                # tensor = transform(tensor)
             torch_params[torch_name].data.copy_(tensor)
             _unused_torch_names.remove(torch_name)
-            _unused_tf_names.remove(tf_name)
+            _unused_tf_names.remove(torch_name)
             bar.update()
 
         def load_dense(torch_prefix, tf_prefix):

@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from utils.visual_evaluation import plot_reconstructions
+from compression.models.load_flowpp_imagenet64 import load_imagenet64_model
 
 
 # learning rate schedule
@@ -42,7 +43,7 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
 
         if not torch.isnan(result['z']).any():
             main_logd = -torch.mean(result['main_logd'])
-            loss = -torch.mean(result['total_logd'])
+            loss = -torch.mean(result['z_logp'])
             bpd = -torch.mean(result['z_logp']) / (64 * 64)
 
             loss.backward()
@@ -54,6 +55,15 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
 
             tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f} \tMain logd: {:11.6f}'
             print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd, main_logd))
+
+            if ((batch_idx + 1) * args.batch_size) % 100 == 0:
+                params = {}
+                for name, value in model.named_parameters():
+                    params[name] = value.to('cpu').detach().numpy()
+
+                filename = f'model_batch-{batch_idx}.npz'
+                print(f'Saving snapshot {filename}')
+                np.savez(filename, **params)
 
     import os
     if not os.path.exists(args.snap_dir + 'training/'):
