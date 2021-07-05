@@ -187,7 +187,7 @@ def run(args, kwargs):
     #     batch_size=args.batch_size,
     #     shuffle=True,
     #     **kwargs)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False, drop_last=False)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, drop_last=False)
 
     # val_loader = torch.utils.data.DataLoader(
     #     dataset,

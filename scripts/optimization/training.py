@@ -19,19 +19,30 @@ def lr_step(step, curr_lr, decay=0.99995, min_lr=5e-4):
 
 
 def train(epoch, train_loader, model, opt, args, decay=0.99995):
-    model.train()
+    stats_file = 'stats_original.csv'
     train_loss = np.zeros(len(train_loader))
     train_bpd = np.zeros(len(train_loader))
 
+    model.train()
+    # for name, p in model.named_parameters():
+        # if 'main_flow' in name:
+        # print(p.requires_grad)
+
     num_data = 0
+    schedule = True
+
+    file = open(stats_file, 'w+')
+    columns = ['epoch', 'percentage', 'main_logd', 'z_logp', 'total_logd', 'dequant_logd']
+    file.write(','.join(columns) + '\n')
+    file.close()
 
     for batch_idx, (data,) in enumerate(train_loader):
         data = data.view(-1, *args.input_size)
         data = data.to(dtype=torch.float64, device=args.device)
 
         global_step = (epoch - 1) * len(train_loader) + (batch_idx + 1)
+
         # update the learning rate according to schedule
-        schedule = True
         if schedule:
             for param_group in opt.param_groups:
                 lr = param_group['lr']
@@ -43,8 +54,8 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
 
         if not torch.isnan(result['z']).any():
             main_logd = -torch.mean(result['main_logd'])
-            loss = -torch.mean(result['z_logp'])
-            bpd = -torch.mean(result['z_logp']) / (64 * 64)
+            loss = -torch.mean(result['total_logd'])
+            bpd = -torch.mean(result['total_logd']) / (64 * 64)
 
             loss.backward()
             opt.step()
@@ -55,6 +66,15 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
 
             tmp = 'Epoch: {:3d} [{:5d}/{:5d} ({:2.0f}%)] \tLoss: {:11.6f}\tbpd: {:8.6f} \tMain logd: {:11.6f}'
             print(tmp.format(epoch, num_data, len(train_loader.sampler), perc, loss, bpd, main_logd))
+
+            logs = [result['main_logd'], result['z_logp'], result['total_logd'], result['dequant_logd']]
+            logs = [torch.mean(x).item() for x in logs]
+
+            values = [epoch, perc] + logs
+            values = [str(x) for x in values]
+            file = open(stats_file, 'a+')
+            file.write(','.join(values) + '\n')
+            file.close()
 
             if ((batch_idx + 1) * args.batch_size) % 100 == 0:
                 params = {}

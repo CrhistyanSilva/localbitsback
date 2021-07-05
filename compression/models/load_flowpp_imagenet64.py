@@ -145,6 +145,8 @@ class Imagenet64Model(CompressionModel):
         assert u.shape == x.shape and dequant_logd.shape == (x.shape[0],)
         # assert (u >= 0).all()
         # assert (u <= 1).all()
+        if (u < 0).any() or (u > 1).any():
+            print('dequant fuera de rango')
 
         z, main_logd = self.main_flow(x + u, aux=None, inverse=False)
         z_logp = sumflat(standard_normal_logp(z))
