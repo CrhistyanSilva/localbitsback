@@ -54,7 +54,10 @@ def train(epoch, train_loader, model, opt, args, decay=0.99995):
 
         if not torch.isnan(result['z']).any():
             main_logd = -torch.mean(result['main_logd'])
-            loss = -torch.mean(result['total_logd'])
+            if batch_idx < 700:
+                loss = -torch.mean(result['z_logp'])
+            else:
+                loss = -torch.mean(result['total_logd'])
             bpd = -torch.mean(result['total_logd']) / (64 * 64)
 
             loss.backward()

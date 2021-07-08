@@ -163,7 +163,6 @@ class Sigmoid(ElementwiseFlow):
             return y, logd
         else:
             y = input_
-            y = torch.clamp(y, 0.01, 0.99)
             if not ((y >= 0).all() and (y <= 1).all()):
                 print('WARNING: Inverse(Sigmoid) input out of [0, 1] bounds!')
             x = inverse_sigmoid(y)
